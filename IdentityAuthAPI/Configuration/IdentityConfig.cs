@@ -10,7 +10,7 @@ using System.Text;
 
 namespace IdentityAuthAPI.Configuration
 {
-    public static class IdentityConfig 
+    public static class IdentityConfig
     {
         public static IServiceCollection AddIdentityConfiguration(this IServiceCollection services,
             IConfiguration configuration)
@@ -23,6 +23,15 @@ namespace IdentityAuthAPI.Configuration
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddErrorDescriber<IdentityPortugueseMessages>()
                 .AddDefaultTokenProviders();
+
+            services.AddCors(options =>
+            {
+                options.AddPolicy("Development",
+                    builder =>
+                        builder
+                        .AllowAnyOrigin()
+                        .AllowCredentials());
+            });
 
             //JWT
 
@@ -40,7 +49,8 @@ namespace IdentityAuthAPI.Configuration
             {
                 j.RequireHttpsMetadata = false;
                 j.SaveToken = true;
-                j.TokenValidationParameters = new TokenValidationParameters {
+                j.TokenValidationParameters = new TokenValidationParameters
+                {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = true,

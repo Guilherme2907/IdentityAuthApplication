@@ -1,13 +1,8 @@
 ﻿using IdentityAuthAPI.Extensions;
+using IdentityAuthAPI.Interfaces;
 using IdentityAuthAPI.ViewModels;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace IdentityAuthAPI.Controllers
@@ -17,17 +12,11 @@ namespace IdentityAuthAPI.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly SignInManager<IdentityUser> _signInManager;
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly AppSettings _appSettings;
+        private readonly IAuthService _authService;
 
-        public AuthController(SignInManager<IdentityUser> signInManager, 
-                                UserManager<IdentityUser> userManager, 
-                                IOptions<AppSettings> appSettings)
+        public AuthController(IAuthService authService)
         {
-            _signInManager = signInManager;
-            _userManager = userManager;
-            _appSettings = appSettings.Value;
+            _authService = authService;
         }
 
         [AllowAnonymous]
@@ -39,23 +28,9 @@ namespace IdentityAuthAPI.Controllers
                 return BadRequest();
             }
 
-            var user = new IdentityUser
-            {
-                UserName = registerUser.Email,
-                Email = registerUser.Email,
-                EmailConfirmed = true
-            };
+            var response = await _authService.RegisterUser(registerUser);
 
-            var result = await _userManager.CreateAsync(user, registerUser.Password);
-
-            if (result.Succeeded)
-            {
-                //isPersistent = false significa que não quer armazenar as informações para facilitar o próximo login 
-                await _signInManager.SignInAsync(user, false);
-                return Ok(GenerateJwt());
-            }
-
-            return Ok(result.Errors);
+            return Ok(response);
         }
 
         [AllowAnonymous]
@@ -67,41 +42,19 @@ namespace IdentityAuthAPI.Controllers
                 return BadRequest();
             }
 
-            var result = await _signInManager.PasswordSignInAsync(loginUser.Email, loginUser.Password, false, true);
+            var response = await _authService.Login(loginUser);
 
-            if (result.Succeeded)
-            {
-                return Ok(GenerateJwt());
-            }
-
-            if (result.IsLockedOut)
-            {
-                return BadRequest();
-            }
-
-            return BadRequest();
+            return Ok(response);
         }
 
-        private string GenerateJwt()
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_appSettings.Secret);
-
-            var token = tokenHandler.CreateToken(new SecurityTokenDescriptor
-            {
-                Issuer = _appSettings.Issuer,
-                Audience = _appSettings.ValidIn,
-                Expires = DateTime.UtcNow.AddHours(_appSettings.ExpiresIn),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256)
-            });
-
-            var encodedToken = tokenHandler.WriteToken(token);
-
-            return encodedToken;
-        }
-
+        /// <summary>
+        /// Endpoint para teste de autenticação e autorização 
+        /// </summary>
+        /// <param name="loginUser"></param>
+        /// <returns></returns>
+        [ClaimsAuthorize("Provider","Update")]
         [HttpGet("teste")]
-        public ActionResult Teste(LoginUserViewModel loginUser)
+        public ActionResult Teste()
         {
             return Ok("Teste");
         }
